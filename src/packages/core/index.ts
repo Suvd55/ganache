@@ -4,7 +4,7 @@ import { ProviderOptions, ServerOptions } from "./src/options";
 import Server from "./src/server";
 export { Server, ServerStatus, _DefaultServerOptions } from "./src/server";
 
-export type { Provider, EthereumProvider, FilecoinProvider } from "@ganache/flavors";
+export type { Provider, EthereumProvider, FilecoinProvider, Transaction } from "@ganache/flavors";
 export type { ProviderOptions, ServerOptions } from "./src/options";
 
 /**
@@ -41,10 +41,10 @@ const Ganache = {
    * @returns A provider instance for the flavor
    * `options.flavor` which defaults to `ethereum`.
    */
-  provider: <T extends FlavorName = typeof DefaultFlavor>(
-    options?: ProviderOptions<T>
-  ): ConnectorsByName[T]["provider"] => {
-    const loader = ConnectorLoader.initialize<T>(options);
+  provider: <Flavor extends FlavorName = typeof DefaultFlavor>(
+    options?: ProviderOptions<Flavor>
+  ): ConnectorsByName[Flavor]["provider"] => {
+    const loader = ConnectorLoader.initialize<Flavor>(options);
     return loader.connector.provider;
   }
 };

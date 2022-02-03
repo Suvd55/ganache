@@ -10,8 +10,10 @@ export type {
   ServerOptions,
   ProviderOptions,
   EthereumProvider,
-  FilecoinProvider,
+  Transaction,
 } from "@ganache/core";
+import type { ConnectorsByName } from "@ganache/flavors";
+export type FilecoinProvider = ConnectorsByName["filecoin"];
 export {
   server,
   provider

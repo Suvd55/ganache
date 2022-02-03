@@ -7,28 +7,19 @@ import {
   CodedError,
   DATA,
   WhisperPostObject,
-  BaseFilterArgs,
-  Filter,
-  FilterArgs,
+  InternalFilter,
   FilterTypes,
   QUANTITY,
-  RangeFilterArgs,
-  StorageRangeResult,
   SubscriptionId,
-  SubscriptionName,
-  EthereumRawAccount,
-  TransactionTraceOptions,
-  TraceTransactionResult
+  EthereumRawAccount
 } from "@ganache/ethereum-utils";
 import { BaseFeeHeader, Block, RuntimeBlock } from "@ganache/ethereum-block";
 import {
-  TypedRpcTransaction,
   TransactionFactory,
   TypedTransaction,
-  TypedTransactionJSON
 } from "@ganache/ethereum-transaction";
 import { toRpcSig, ecsign, hashPersonalMessage, KECCAK256_NULL } from "ethereumjs-util";
-import { TypedData as NotTypedData, signTypedData_v4 } from "eth-sig-util";
+import { signTypedData_v4 } from "eth-sig-util";
 import {
   Data,
   Heap,
@@ -53,15 +44,16 @@ import { decode } from "@ganache/rlp";
 import { Address } from "@ganache/ethereum-address";
 import { GanacheRawBlock } from "@ganache/ethereum-block";
 import { Capacity } from "./miner/miner";
+import { Transaction, MineOptions, TypedData, SubscriptionName, SubscriptionOptions, LogsFilter, Filter, TraceTransactionOptions, TraceTransactionResult, StorageRangeAtResult, SignedTransaction, QueuedTransaction } from "./api-types";
 
 async function autofillDefaultTransactionValues(
   tx: TypedTransaction,
   eth_estimateGas: (
-    tx: TypedRpcTransaction,
+    tx: Transaction,
     tag: QUANTITY | Tag
   ) => Promise<Quantity>,
   eth_maxPriorityFeePerGas: () => Promise<Quantity>,
-  transaction: TypedRpcTransaction,
+  transaction: Transaction,
   blockchain: Blockchain,
   options: EthereumInternalOptions
 ) {
@@ -104,13 +96,6 @@ const RPC_MODULES = {
   evm: "1.0",
   personal: "1.0"
 } as const;
-//#endregion
-
-//#region misc types
-type TypedData = Exclude<
-  Parameters<typeof signTypedData_v4>[1]["data"],
-  NotTypedData
->;
 //#endregion
 
 //#region helpers
@@ -157,7 +142,7 @@ export default class EthereumApi implements Api {
     id => () =>
       Quantity.from(++id)
   )(0);
-  readonly #filters = new Map<string, Filter>();
+  readonly #filters = new Map<string, InternalFilter>();
   readonly #subscriptions = new Map<string, Emittery.UnsubscribeFn>();
   readonly #options: EthereumInternalOptions;
   readonly #blockchain: Blockchain;
@@ -300,13 +285,10 @@ export default class EthereumApi implements Api {
    * ```
    */
   async evm_mine(timestamp: number): Promise<"0x0">;
-  async evm_mine(options: {
-    timestamp?: number;
-    blocks?: number;
-  }): Promise<"0x0">;
+  async evm_mine(options: MineOptions): Promise<"0x0">;
   @assertArgLength(0, 1)
   async evm_mine(
-    arg?: number | { timestamp?: number; blocks?: number }
+    arg?: number | MineOptions
   ): Promise<"0x0"> {
     const blockchain = this.#blockchain;
     const options = this.#options;
@@ -914,7 +896,7 @@ export default class EthereumApi implements Api {
    */
   @assertArgLength(1, 2)
   async eth_estimateGas(
-    transaction: TypedRpcTransaction,
+    transaction: Transaction,
     blockNumber: QUANTITY | Tag = Tag.latest
   ): Promise<Quantity> {
     const blockchain = this.#blockchain;
@@ -1220,7 +1202,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(2)
-  async eth_getTransactionByBlockHashAndIndex(hash: DATA, index: QUANTITY) {
+  async eth_getTransactionByBlockHashAndIndex(hash: DATA, index: QUANTITY): Promise<SignedTransaction | null> {
     const blockchain = this.#blockchain;
     const block = await blockchain.blocks
       .getByHash(hash)
@@ -1269,7 +1251,7 @@ export default class EthereumApi implements Api {
   async eth_getTransactionByBlockNumberAndIndex(
     number: QUANTITY | Tag,
     index: QUANTITY
-  ) {
+  ): Promise<SignedTransaction | null> {
     const blockchain = this.#blockchain;
     const block = await blockchain.blocks.get(number).catch<Block>(_ => null);
     if (!block) return null;
@@ -1715,7 +1697,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_getTransactionByHash(transactionHash: DATA) {
+  async eth_getTransactionByHash(transactionHash: DATA): Promise<SignedTransaction | QueuedTransaction | null> {
     const { transactions } = this.#blockchain;
     const hashBuffer = Data.from(transactionHash).toBuffer();
 
@@ -1784,9 +1766,9 @@ export default class EthereumApi implements Api {
       if (tx != null) {
         options.logging.logger.log(
           " > Ganache `eth_getTransactionReceipt` notice: the transaction with hash\n" +
-            ` > \`${dataHash.toString()}\` has not\n` +
-            " > yet been mined." +
-            " See https://trfl.io/v7-instamine for additional information."
+          ` > \`${dataHash.toString()}\` has not\n` +
+          " > yet been mined." +
+          " See https://trfl.io/v7-instamine for additional information."
         );
       }
     }
@@ -1816,7 +1798,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_sendTransaction(transaction: TypedRpcTransaction) {
+  async eth_sendTransaction(transaction: Transaction): Promise<Data> {
     const blockchain = this.#blockchain;
 
     const tx = TransactionFactory.fromRpc(transaction, blockchain.common);
@@ -1869,7 +1851,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_signTransaction(transaction: TypedRpcTransaction) {
+  async eth_signTransaction(transaction: Transaction) {
     const blockchain = this.#blockchain;
     const tx = TransactionFactory.fromRpc(transaction, blockchain.common);
 
@@ -2131,12 +2113,12 @@ export default class EthereumApi implements Api {
    */
   eth_subscribe(
     subscriptionName: Extract<SubscriptionName, "logs">,
-    options: BaseFilterArgs
+    options: SubscriptionOptions
   ): PromiEvent<Quantity>;
   @assertArgLength(1, 2)
   eth_subscribe(
     subscriptionName: SubscriptionName,
-    options?: BaseFilterArgs
+    options?: SubscriptionOptions
   ): PromiEvent<Quantity> {
     const subscriptions = this.#subscriptions;
     switch (subscriptionName) {
@@ -2229,7 +2211,7 @@ export default class EthereumApi implements Api {
         const subscription = this.#getId();
         const promiEvent = PromiEvent.resolve(subscription);
 
-        this.#subscriptions.set(subscription.toString(), () => {});
+        this.#subscriptions.set(subscription.toString(), () => { });
         return promiEvent;
       }
       default:
@@ -2364,7 +2346,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(0, 1)
-  async eth_newFilter(filter?: RangeFilterArgs) {
+  async eth_newFilter(filter?: Filter) {
     const blockchain = this.#blockchain;
     if (filter == null) filter = {};
     const { addresses, topics } = parseFilterDetails(filter || {});
@@ -2569,7 +2551,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_getLogs(filter: FilterArgs) {
+  async eth_getLogs(filter: LogsFilter) {
     return this.#blockchain.blockLogs.getLogs(filter);
   }
 
@@ -2638,7 +2620,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1, 2)
-  async eth_call(transaction: any, blockNumber: QUANTITY | Tag = Tag.latest) {
+  async eth_call(transaction: Transaction, blockNumber: QUANTITY | Tag = Tag.latest) {
     const blockchain = this.#blockchain;
     const common = this.#blockchain.common;
     const blocks = blockchain.blocks;
@@ -2795,7 +2777,7 @@ export default class EthereumApi implements Api {
    */
   async debug_traceTransaction(
     transactionHash: DATA,
-    options?: TransactionTraceOptions
+    options?: TraceTransactionOptions
   ): Promise<TraceTransactionResult> {
     return this.#blockchain.traceTransaction(transactionHash, options || {});
   }
@@ -2849,7 +2831,7 @@ export default class EthereumApi implements Api {
     contractAddress: DATA,
     startKey: DATA,
     maxResult: number
-  ): Promise<StorageRangeResult> {
+  ): Promise<StorageRangeAtResult> {
     return this.#blockchain.storageRangeAt(
       blockHash,
       Quantity.from(transactionIndex).toNumber(),
@@ -3019,7 +3001,7 @@ export default class EthereumApi implements Api {
    */
   @assertArgLength(2)
   async personal_sendTransaction(
-    transaction: TypedRpcTransaction,
+    transaction: Transaction,
     passphrase: string
   ) {
     const blockchain = this.#blockchain;
@@ -3075,9 +3057,9 @@ export default class EthereumApi implements Api {
    */
   @assertArgLength(2)
   async personal_signTransaction(
-    transaction: TypedRpcTransaction,
+    transaction: Transaction,
     passphrase: string
-  ) {
+  ): Promise<Data> {
     const blockchain = this.#blockchain;
     const tx = TransactionFactory.fromRpc(transaction, blockchain.common);
 
@@ -3088,7 +3070,7 @@ export default class EthereumApi implements Api {
     const wallet = this.#wallet;
     const secretKey = await wallet.getFromKeyFile(tx.from, passphrase);
     tx.signAndHash(secretKey);
-    return Data.from(tx.serialized).toString();
+    return Data.from(tx.serialized);
   }
   //#endregion
 
@@ -3273,34 +3255,33 @@ export default class EthereumApi implements Api {
    */
   @assertArgLength(0)
   async txpool_content(): Promise<{
-    pending: Map<string, Map<string, TypedTransactionJSON>>;
-    queued: Map<string, Map<string, TypedTransactionJSON>>;
+    pending: Record<string, Record<string, QueuedTransaction>>;
+    queued: Record<string, Record<string, QueuedTransaction>>;
   }> {
     const { transactions, common } = this.#blockchain;
-    const { transactionPool } = transactions;
+    const { transactionPool: { executables, origins } } = transactions;
 
     const processMap = (map: Map<string, Heap<TypedTransaction>>) => {
-      let res = new Map<string, Map<string, TypedTransactionJSON>>();
-      for (let [_, transactions] of map) {
-        const arr = transactions.array;
-        for (let i = 0; i < transactions.length; ++i) {
-          const tx = arr[i];
-          const from = tx.from.toString();
+      let res: Record<string, Record<string, QueuedTransaction>> = {};
+      for (let [_, { array, length }] of map) {
+        for (let i = 0; i < length; ++i) {
+          const transaction = array[i];
+          const from = transaction.from.toString();
           if (res[from] === undefined) {
             res[from] = {};
           }
           // The nonce keys are actual decimal numbers (as strings) and not
           // hex literals (based on what geth returns).
-          const nonce = tx.nonce.toBigInt().toString();
-          res[from][nonce] = tx.toJSON(common);
+          const nonce = transaction.nonce.toBigInt().toString();
+          res[from][nonce] = transaction.toJSON(common) as QueuedTransaction;
         }
       }
       return res;
     };
 
     return {
-      pending: processMap(transactionPool.executables.pending),
-      queued: processMap(transactionPool.origins)
+      pending: processMap(executables.pending),
+      queued: processMap(origins)
     };
   }
 

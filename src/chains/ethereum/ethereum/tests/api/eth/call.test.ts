@@ -1,10 +1,11 @@
 import assert from "assert";
-import EthereumProvider from "../../../src/provider";
+import { EthereumProvider } from "../../../src/provider";
 import getProvider from "../../helpers/getProvider";
 import compile, { CompileOutput } from "../../helpers/compile";
 import { join } from "path";
-import { BUFFER_EMPTY, Quantity, RPCQUANTITY_EMPTY } from "@ganache/utils";
+import { BUFFER_EMPTY, Quantity } from "@ganache/utils";
 import { CallError } from "@ganache/ethereum-utils";
+import { Transaction } from "@ganache/ethereum-transaction";
 
 describe("api", () => {
   describe("eth", () => {
@@ -13,7 +14,7 @@ describe("api", () => {
       let provider: EthereumProvider;
       let from, to: string;
       let contractAddress: string;
-      let tx: object;
+      let tx: Transaction;
 
       before("compile", () => {
         contract = compile(join(__dirname, "./contracts/EthCall.sol"), {
@@ -80,7 +81,7 @@ describe("api", () => {
       });
 
       it("allows eip-1559 fee market transactions", async () => {
-        const tx = {
+        const tx: Transaction = {
           from,
           to: contractAddress,
           data: "0x3fa4f245",
@@ -100,7 +101,8 @@ describe("api", () => {
       });
 
       it("rejects transactions that specify both legacy and eip-1559 transaction fields", async () => {
-        const tx = {
+        // `any` because this tests how we handle an invalid transaction
+        const tx: any = {
           from,
           to: contractAddress,
           data: "0x3fa4f245",

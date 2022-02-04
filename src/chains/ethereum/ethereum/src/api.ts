@@ -44,7 +44,7 @@ import { decode } from "@ganache/rlp";
 import { Address } from "@ganache/ethereum-address";
 import { GanacheRawBlock } from "@ganache/ethereum-block";
 import { Capacity } from "./miner/miner";
-import { Transaction, MineOptions, TypedData, SubscriptionName, SubscriptionOptions, LogsFilter, Filter, TraceTransactionOptions, TraceTransactionResult, StorageRangeAtResult, SignedTransaction, QueuedTransaction } from "./api-types";
+import { Transaction, MineOptions, TypedData, SubscriptionName, SubscriptionOptions, LogsFilter, Filter, TraceTransactionOptions, TraceTransactionResult, StorageRangeAtResult, SignedTransaction, PooledTransaction, TransactionPoolContent } from "./api-types";
 
 async function autofillDefaultTransactionValues(
   tx: TypedTransaction,
@@ -1418,7 +1418,7 @@ export default class EthereumApi implements Api {
    *
    * @param hashRate - A hexadecimal string representation (32 bytes) of the hash rate.
    * @param clientID - A random hexadecimal(32 bytes) ID identifying the client.
-   * @returns `true` if submitting went through succesfully and `false` otherwise.
+   * @returns `true` if submitting went through successfully and `false` otherwise.
    * @example
    * ```javascript
    * const hashRate = "0x0000000000000000000000000000000000000000000000000000000000000001";
@@ -1697,7 +1697,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_getTransactionByHash(transactionHash: DATA): Promise<SignedTransaction | QueuedTransaction | null> {
+  async eth_getTransactionByHash(transactionHash: DATA): Promise<SignedTransaction | PooledTransaction | null> {
     const { transactions } = this.#blockchain;
     const hashBuffer = Data.from(transactionHash).toBuffer();
 
@@ -2103,7 +2103,7 @@ export default class EthereumApi implements Api {
    * Starts a subscription to a particular event. For every event that matches
    * the subscription a JSON-RPC notification with event details and
    * subscription ID will be sent to a client.
-   *
+   * 
    * @param subscriptionName -
    * @param options - Filter options:
    *  * `address`: either an address or an array of addresses. Only logs that
@@ -2287,7 +2287,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(0)
-  async eth_newPendingTransactionFilter() {
+  async eth_newPendingTransactionFilter(): Promise<Quantity> {
     const unsubscribe = this.#blockchain.on(
       "pendingTransaction",
       (transaction: TypedTransaction) => {
@@ -2333,7 +2333,7 @@ export default class EthereumApi implements Api {
    * * `toBlock`: `QUANTITY | TAG` (optional) - Integer block number, or the string "latest", "earliest"
    * or "pending".
    * * `address`: `DATA | Array` (optional) - Contract address or a list of addresses from which the logs should originate.
-   * * `topics`: `Array of DATA` (optional) - Array of 32 Bytes `DATA` topcis. Topics are order-dependent. Each topic can also
+   * * `topics`: `Array of DATA` (optional) - Array of 32 Bytes `DATA` topics. Topics are order-dependent. Each topic can also
    * be an array of `DATA` with "or" options.
    *
    * @param filter - The filter options as seen in source.
@@ -2346,7 +2346,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(0, 1)
-  async eth_newFilter(filter?: Filter) {
+  async eth_newFilter(filter?: Filter): Promise<Quantity> {
     const blockchain = this.#blockchain;
     if (filter == null) filter = {};
     const { addresses, topics } = parseFilterDetails(filter || {});
@@ -2424,7 +2424,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_getFilterChanges(filterId: QUANTITY) {
+  async eth_getFilterChanges(filterId: QUANTITY): Promise<Data[]> {
     const filter = this.#filters.get(Quantity.from(filterId).toString());
     if (filter) {
       const updates = filter.updates;
@@ -2450,7 +2450,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_uninstallFilter(filterId: QUANTITY) {
+  async eth_uninstallFilter(filterId: QUANTITY): Promise<boolean> {
     const id = Quantity.from(filterId).toString();
     const filter = this.#filters.get(id);
     if (!filter) return false;
@@ -2512,7 +2512,7 @@ export default class EthereumApi implements Api {
    * * `toBlock`: `QUANTITY | TAG` (optional) - Integer block number, or the string "latest", "earliest"
    * or "pending".
    * * `address`: `DATA | Array` (optional) - Contract address or a list of addresses from which the logs should originate.
-   * * `topics`: `Array of DATA` (optional) - Array of 32 Bytes `DATA` topcis. Topics are order-dependent. Each topic can also
+   * * `topics`: `Array of DATA` (optional) - Array of 32 Bytes `DATA` topics. Topics are order-dependent. Each topic can also
    * be an array of `DATA` with "or" options.
    * * `blockHash`: `DATA`, 32 Bytes (optional) - Hash of the block to restrict logs from. If `blockHash` is present,
    * then neither `fromBlock` or `toBlock` are allowed.
@@ -3254,15 +3254,12 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(0)
-  async txpool_content(): Promise<{
-    pending: Record<string, Record<string, QueuedTransaction>>;
-    queued: Record<string, Record<string, QueuedTransaction>>;
-  }> {
+  async txpool_content(): Promise<TransactionPoolContent> {
     const { transactions, common } = this.#blockchain;
     const { transactionPool: { executables, origins } } = transactions;
 
     const processMap = (map: Map<string, Heap<TypedTransaction>>) => {
-      let res: Record<string, Record<string, QueuedTransaction>> = {};
+      let res: Record<string, Record<string, PooledTransaction>> = {};
       for (let [_, { array, length }] of map) {
         for (let i = 0; i < length; ++i) {
           const transaction = array[i];
@@ -3273,7 +3270,7 @@ export default class EthereumApi implements Api {
           // The nonce keys are actual decimal numbers (as strings) and not
           // hex literals (based on what geth returns).
           const nonce = transaction.nonce.toBigInt().toString();
-          res[from][nonce] = transaction.toJSON(common) as QueuedTransaction;
+          res[from][nonce] = transaction.toJSON(common) as PooledTransaction;
         }
       }
       return res;

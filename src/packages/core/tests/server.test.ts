@@ -17,7 +17,7 @@ import intoStream = require("into-stream");
 import { PromiEvent } from "@ganache/utils";
 import { promisify } from "util";
 import { ServerOptions } from "../src/options";
-import { Connector, Provider as EthereumProvider } from "@ganache/ethereum";
+import { Connector, EthereumProvider } from "@ganache/ethereum";
 import { NetworkInterfaceInfo, networkInterfaces } from 'os';
 
 const IS_WINDOWS = process.platform === "win32";

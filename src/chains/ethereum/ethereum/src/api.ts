@@ -44,7 +44,7 @@ import { decode } from "@ganache/rlp";
 import { Address } from "@ganache/ethereum-address";
 import { GanacheRawBlock } from "@ganache/ethereum-block";
 import { Capacity } from "./miner/miner";
-import { CallTransaction, Transaction, MineOptions, TypedData, SubscriptionName, SubscriptionOptions, LogsFilter, Filter, TraceTransactionOptions, TraceTransactionResult, StorageRangeAtResult, SignedTransaction, PooledTransaction, TransactionPoolContent } from "./api-types";
+import { CallTransaction, Transaction, MineOptions, TypedData, SubscriptionName, SubscriptionOptions, LogsFilter, Filter, TraceTransactionOptions, TraceTransactionResult, StorageRangeAtResult, SignedTransaction, PooledTransaction, TransactionPoolContent, TransactionReceipt } from "./api-types";
 
 async function autofillDefaultTransactionValues(
   tx: TypedTransaction,
@@ -180,7 +180,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(3)
-  async db_putString(dbName: string, key: string, value: string) {
+  async db_putString(dbName: string, key: string, value: string): Promise<boolean> {
     return false;
   }
 
@@ -1734,7 +1734,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_getTransactionReceipt(transactionHash: DATA) {
+  async eth_getTransactionReceipt(transactionHash: DATA): Promise<TransactionReceipt> {
     const { transactions, transactionReceipts, blocks, common } =
       this.#blockchain;
     const dataHash = Data.from(transactionHash);

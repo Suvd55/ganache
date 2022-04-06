@@ -4,7 +4,7 @@ import { ProviderOptions, ServerOptions } from "./src/options";
 import Server from "./src/server";
 export { Server, ServerStatus, _DefaultServerOptions } from "./src/server";
 
-export type { Provider, EthereumProvider, FilecoinProvider, Transaction } from "@ganache/flavors";
+export type { Provider, Ethereum, EthereumProvider, FilecoinProvider } from "@ganache/flavors";
 export type { ProviderOptions, ServerOptions } from "./src/options";
 
 /**

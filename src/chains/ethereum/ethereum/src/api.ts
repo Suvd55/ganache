@@ -10,7 +10,6 @@ import {
   InternalFilter,
   FilterTypes,
   QUANTITY,
-  SubscriptionId,
   EthereumRawAccount
 } from "@ganache/ethereum-utils";
 import { BaseFeeHeader, Block, RuntimeBlock } from "@ganache/ethereum-block";
@@ -2236,7 +2235,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async eth_unsubscribe(subscriptionId: SubscriptionId) {
+  async eth_unsubscribe(subscriptionId: Ethereum.SubscriptionId) {
     const subscriptions = this.#subscriptions;
     const unsubscribe = subscriptions.get(subscriptionId);
     if (unsubscribe) {
@@ -3219,7 +3218,7 @@ export default class EthereumApi implements Api {
    * ```
    */
   @assertArgLength(1)
-  async shh_post(postData: WhisperPostObject) {
+  async shh_post(postData: Ethereum.WhisperPostObject) {
     return false;
   }
 
